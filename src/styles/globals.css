@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@tailwind screens;
+
+body {
+    @apply flex;
+    @apply flex-col;
+    @apply min-h-screen;
+    @apply bg-transparent;
+    @apply font-mono
+}
+
+input[type=text],
+input[type=password] {
+    @apply border;
+    @apply border-gray-600;
+    @apply m-1;
+    @apply rounded-lg;
+    @apply p-1;
+    @apply outline-none;
+}
