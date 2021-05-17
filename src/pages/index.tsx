@@ -9,7 +9,8 @@ export default function Home() {
   const [privateKey, setPrivateKey] = useState<string>();
   const [cert, setCert] = useState<string>();
   const [caCert, setCaCert] = useState<string>();
-  const [contentToSign, setContentToSign] = useState<string>();
+  const [contentToSign, setContentToSign] =
+    useState<string>('{"Hello":"World"}');
   const [contentToSignSHA256Digest, setContentToSignSHA256Digest] =
     useState<forge.md.MessageDigest>();
   const [signature, setSignature] = useState<string>();
@@ -114,6 +115,11 @@ export default function Home() {
     }
   }, [cert, signature, contentToSignSHA256Digest]);
 
+  useEffect(
+    () => verifySignatureOfSHA256DigestContent(),
+    [cert, signature, contentToSignSHA256Digest]
+  );
+
   const VerifySignedSHA256DigestHex = useCallback(
     () => (
       <div className='w-full break-all'>
@@ -164,20 +170,24 @@ export default function Home() {
           placeholder='Senha / PIN'
           onChange={(e) => setPfxPassword(e.currentTarget.value)}
         />
-        <div {...getRootProps({ className: 'border-2 border-dashed' })}>
+        <div
+          {...getRootProps({
+            className: 'border-2 border-dashed p-5 cursor-pointer',
+          })}
+        >
           <input {...getInputProps()} />
           <p>Clique aqui para carregar o arquivo PFX</p>
         </div>
 
         {acceptedFiles[0] && (
-          <p>
-            Arquivo carregado:
+          <>
+            <p>Arquivo carregado:</p>
             <ul>
               <li>Nome: {acceptedFiles[0].name} </li>
               <li>Tamanho: {acceptedFiles[0].size} </li>
               <li>Tipo: {acceptedFiles[0].type} </li>
             </ul>
-          </p>
+          </>
         )}
 
         <button
@@ -229,6 +239,7 @@ export default function Home() {
             <input
               type='text'
               placeholder='Texto para Assinar'
+              defaultValue={contentToSign}
               onChange={(e) => setContentToSign(e.currentTarget.value)}
             />
             <ContentToSignSHA256DigestHex />
