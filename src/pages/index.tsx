@@ -54,6 +54,26 @@ export default function Home() {
     } else alert('Inclua o arquivo PFX e a Senha');
   }, [pfxFile, pfxPassword]);
 
+  const verifyCertWithCACert = useCallback(() => {
+    if (cert !== undefined && caCert !== undefined) {
+      const certificate = forge.pki.certificateFromPem(cert);
+      const caCertificate = forge.pki.certificateFromPem(caCert);
+      try {
+        setCertificateValidation(
+          caCertificate.verify(certificate)
+            ? 'Certificado Validado pelo Certificado da CA'
+            : 'Certificado Invalidado pelo Certificado da CA'
+        );
+      } catch (error) {
+        setCertificateValidation(
+          'Certificado Inválido ou Não Emitido pelo certificado da CA em questão'
+        );
+      }
+    }
+  }, [cert, caCert]);
+
+  useEffect(() => verifyCertWithCACert(), [privateKey, cert, caCert]);
+
   useEffect(() => {
     if (contentToSign) {
       const md = forge.md.sha256.create();
@@ -135,24 +155,6 @@ export default function Home() {
     [isValidsignature]
   );
 
-  const verifyCertWithCACert = useCallback(() => {
-    if (cert !== undefined && caCert !== undefined) {
-      const certificate = forge.pki.certificateFromPem(cert);
-      const caCertificate = forge.pki.certificateFromPem(caCert);
-      try {
-        setCertificateValidation(
-          caCertificate.verify(certificate)
-            ? 'Certificado Validado pelo Certificado da CA'
-            : 'Certificado Invalidado pelo Certificado da CA'
-        );
-      } catch (error) {
-        setCertificateValidation(
-          'Certificado Inválido ou Não Emitido pelo certificado da CA em questão'
-        );
-      }
-    }
-  }, [cert, caCert]);
-
   return (
     <>
       <Head>
@@ -164,12 +166,6 @@ export default function Home() {
         <link rel='icon' href='/favicon.ico' />
       </Head>
       <main className='w-full  p-10 flex flex-col space-y-4'>
-        <label>Senha para assinar com o arquivo PFX</label>
-        <input
-          type='password'
-          placeholder='Senha / PIN'
-          onChange={(e) => setPfxPassword(e.currentTarget.value)}
-        />
         <div
           {...getRootProps({
             className: 'border-2 border-dashed p-5 cursor-pointer',
@@ -187,20 +183,27 @@ export default function Home() {
               <li>Tamanho: {acceptedFiles[0].size} </li>
               <li>Tipo: {acceptedFiles[0].type} </li>
             </ul>
+            <label>Senha para assinar com o arquivo PFX</label>
+            <input
+              type='password'
+              placeholder='Senha / PIN'
+              onChange={(e) => setPfxPassword(e.currentTarget.value)}
+            />
           </>
         )}
-
-        <button
-          type='button'
-          className='bg-black text-white rounded-lg p-2 disabled:bg-gray-700 '
-          disabled={
-            (pfxPassword === undefined || pfxPassword?.length === 0) &&
-            pfxFile === undefined
-          }
-          onClick={openPfx}
-        >
-          Abrir arquivo PFX
-        </button>
+        {acceptedFiles[0] && pfxPassword && (
+          <button
+            type='button'
+            className='bg-black text-white rounded-lg p-2 disabled:bg-gray-700 '
+            disabled={
+              (pfxPassword === undefined || pfxPassword?.length === 0) &&
+              pfxFile === undefined
+            }
+            onClick={openPfx}
+          >
+            Abrir arquivo PFX
+          </button>
+        )}
         {privateKey && cert && caCert && (
           <div className='flex flex-col space-y-4'>
             <div className='flex flex-row space-x-4 w-44 text-xs font-mono '>
