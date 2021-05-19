@@ -66,7 +66,10 @@ export default function Home() {
                   }
                   if (extension['name'] === 'cRLDistributionPoints') {
                     setCRLDistributionPoints(
-                      getLdapURLValue(extension['value'])
+                      getLdapURLValue(extension['value'])?.replaceAll(
+                        /(\%20)/g,
+                        ' '
+                      )
                     );
                   }
                 });
