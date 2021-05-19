@@ -8,6 +8,7 @@ export default function Home() {
   const [pfxFile, setPfxFile] = useState<FileWithPath>();
   const [privateKey, setPrivateKey] = useState<string>();
   const [cert, setCert] = useState<string>();
+  const [cRLDistributionPoints, setCRLDistributionPoints] = useState<string>();
   const [caCert, setCaCert] = useState<string>();
   const [contentToSign, setContentToSign] =
     useState<string>('{"Hello":"World"}');
@@ -16,12 +17,25 @@ export default function Home() {
   const [signature, setSignature] = useState<string>();
   const [isValidsignature, setIsValidSignature] = useState<boolean>();
   const [certificateValidation, setCertificateValidation] = useState<string>();
+  const [isRevoked, setIsRevoked] = useState<boolean>(false);
 
   const { acceptedFiles, getRootProps, getInputProps } = useDropzone({
     multiple: false,
     onDrop: async (acceptedFiles: FileWithPath[], _fileRejection, _event) =>
       setPfxFile(acceptedFiles[0]!),
   });
+
+  function getLdapURLValue(value: string): string | undefined {
+    const result = value.match(/(ldap:\/\/\/[\w\=\,\-\%\?]+)/);
+    return result === null ? undefined : result[0];
+  }
+
+  async function queryIfRevoked(
+    serialNumber: string
+  ): Promise<{ serialNumber: string; isRevoked: boolean }> {
+    const crlResponse = await fetch(`/api/crl?serialNumber=${serialNumber}`);
+    return crlResponse.json();
+  }
 
   const openPfx = useCallback(async () => {
     if (pfxFile && pfxPassword) {
@@ -32,18 +46,31 @@ export default function Home() {
         const p12Der = forge.util.decode64(p12b64);
         const p12Asn1 = forge.asn1.fromDer(p12Der);
         const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, pfxPassword);
+        // console.log(p12);
         p12.safeContents.forEach(({ encrypted, safeBags }) => {
           if (!encrypted) {
             safeBags.forEach((bag) => {
               if (bag.key) setPrivateKey(forge.pki.privateKeyToPem(bag.key));
               if (bag.cert) {
-                bag.cert.extensions.forEach((extension) => {
+                bag.cert.extensions.forEach(async (extension) => {
                   if (extension['keyCertSign'] !== undefined) {
                     if (extension['keyCertSign'])
                       setCaCert(forge.pki.certificateToPem(bag.cert!));
-                    else setCert(forge.pki.certificateToPem(bag.cert!));
+                    else {
+                      setCert(forge.pki.certificateToPem(bag.cert!));
+                      const crlCheck = await queryIfRevoked(
+                        bag.cert?.serialNumber!
+                      );
+                      setIsRevoked(crlCheck.isRevoked);
+                    }
+                  }
+                  if (extension['name'] === 'cRLDistributionPoints') {
+                    setCRLDistributionPoints(
+                      getLdapURLValue(extension['value'])
+                    );
                   }
                 });
+                // console.log(bag.cert);
               }
             });
           }
@@ -128,7 +155,7 @@ export default function Home() {
       );
       setIsValidSignature(
         publicKey.verify(
-          contentToSignSHA256Digest.digest().bytes(),
+          forge.util.hexToBytes(contentToSignSHA256Digest.digest().toHex()),
           forge.util.hexToBytes(signature)
         )
       );
@@ -205,25 +232,38 @@ export default function Home() {
           </button>
         )}
         {privateKey && cert && caCert && (
-          <div className='flex flex-col space-y-4'>
-            <div className='flex flex-row space-x-4 w-44 text-xs font-mono '>
-              <div>
+          <div className='w-full flex flex-col space-y-4'>
+            <div className='flex flex-row space-x-4 text-xs font-mono '>
+              <div className='w-1/3'>
                 <strong>Chave Privada do Assinador</strong>
                 <br />
                 {privateKey}
               </div>
-              <div>
-                <strong>Certificado Digital do Assinador</strong>
-                <br />
-                {certificateValidation && (
-                  <i>
-                    {certificateValidation}
-                    <br />
-                  </i>
-                )}
-                {cert}
+              <div className='w-1/3'>
+                <p>
+                  <strong>Certificado Digital do Assinador</strong>
+                </p>
+                <p>
+                  {certificateValidation && (
+                    <i>
+                      {certificateValidation}
+                      <br />
+                    </i>
+                  )}
+                </p>
+
+                <p>
+                  <strong>
+                    <i>
+                      {isRevoked &&
+                        'Serial Number do certificado está marcado como Revogado após verificação CRL'}
+                    </i>
+                  </strong>
+                </p>
+                <p>{cert}</p>
+                {cRLDistributionPoints && <p>{cRLDistributionPoints}</p>}
               </div>
-              <div>
+              <div className='w-1/3'>
                 <strong>Certificado Digital da Autoridade Certificadora</strong>
                 <br />
                 {caCert}
